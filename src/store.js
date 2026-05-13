@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import localforage from 'localforage';
+import * as api from './services/api';
 
 localforage.config({
   name: 'LocalBazaarDB',
@@ -67,6 +68,56 @@ export const useStore = create(
         syncChannel.postMessage({ type: 'DATA_CHANGED', notification });
       },
 
+      fetchProducts: async () => {
+        try {
+          const products = await api.getProducts();
+          set({ products });
+        } catch (error) {
+          get().addNotification('Unable to load products from backend', 'error');
+        }
+      },
+
+      fetchOrders: async (filters = {}) => {
+        try {
+          const query = Object.keys(filters).length ? `?${new URLSearchParams(filters).toString()}` : '';
+          const orders = await api.getOrders(query);
+          set({ orders });
+        } catch (error) {
+          get().addNotification('Unable to load orders from backend', 'error');
+        }
+      },
+
+      createOrder: async (order) => {
+        try {
+          const savedOrder = await api.createOrder(order);
+          set((state) => ({ orders: [savedOrder, ...state.orders] }));
+          get().addNotification(`Order ${savedOrder.id} placed`, 'success');
+          get().syncWithOthers();
+          return savedOrder;
+        } catch (error) {
+          const state = get();
+          const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+          const fallbackOrder = {
+            ...order,
+            id: orderId,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            buyerId: state.user?.phone,
+            sellerId: order.sellerId,
+            buyerName: state.user?.name,
+            buyerPhone: state.user?.phone,
+            buyerLocation: state.user?.location,
+            sellerLocation: order.product?.location || null,
+            sellerName: order.product?.seller || state.user?.shopDetails?.name,
+            deliveryLocation: state.user?.location ? `${state.user.location.lat.toFixed(3)}, ${state.user.location.lng.toFixed(3)}` : order.deliveryLocation || 'Unknown'
+          };
+          set((state) => ({ orders: [fallbackOrder, ...state.orders] }));
+          get().addNotification(`Order ${orderId} placed offline`, 'warning');
+          get().syncWithOthers();
+          return fallbackOrder;
+        }
+      },
+
       addProduct: (product) => {
         const newProduct = { 
           ...product, 
@@ -115,21 +166,42 @@ export const useStore = create(
         get().syncWithOthers();
       },
 
-      updateOrderStatus: (orderId, newStatus) => {
-        set((state) => ({
-          orders: state.orders.map(order =>
-            order.id === orderId 
-              ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
-              : order
-          )
-        }));
-        get().addNotification(`Order ${orderId} updated to ${newStatus}`, 'success');
-        get().syncWithOthers();
+      updateOrderStatus: async (orderId, newStatus) => {
+        try {
+          await api.updateOrderStatus(orderId, newStatus);
+          set((state) => ({
+            orders: state.orders.map(order =>
+              order.id === orderId
+                ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
+                : order
+            )
+          }));
+          get().addNotification(`Order ${orderId} updated to ${newStatus}`, 'success');
+          get().syncWithOthers();
+        } catch (error) {
+          set((state) => ({
+            orders: state.orders.map(order =>
+              order.id === orderId
+                ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
+                : order
+            )
+          }));
+          get().addNotification(`Order ${orderId} updated locally`, 'warning');
+          get().syncWithOthers();
+        }
       },
 
-      saveReceipt: (receiptData) => set((state) => ({
-        receipts: [...state.receipts, receiptData]
-      })),
+      saveReceipt: async (receiptData) => {
+        try {
+          const savedReceipt = await api.saveReceipt(receiptData);
+          set((state) => ({ receipts: [...state.receipts, savedReceipt] }));
+          return savedReceipt;
+        } catch (error) {
+          set((state) => ({ receipts: [...state.receipts, receiptData] }));
+          get().addNotification('Saved receipt locally', 'warning');
+          return receiptData;
+        }
+      },
 
       getReceiptByOrderId: (orderId) => {
         const state = get();

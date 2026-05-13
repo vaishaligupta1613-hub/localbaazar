@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store';
 import { Search, MapPin, Star, Clock, Heart, Store } from 'lucide-react';
@@ -7,9 +7,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const Feed = () => {
   const { t } = useTranslation();
-  const { products, incrementProductViews, user, wishlist, toggleWishlist } = useStore();
+  const { products, incrementProductViews, user, wishlist, toggleWishlist, fetchProducts } = useStore();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (products.length === 0) {
+      fetchProducts();
+    }
+  }, [products.length, fetchProducts]);
 
   const handleProductClick = (product) => {
     incrementProductViews(product.id);

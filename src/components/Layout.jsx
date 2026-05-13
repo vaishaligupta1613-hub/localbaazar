@@ -7,13 +7,25 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Layout = ({ children }) => {
-  const { user, seedProducts, notifications } = useStore();
+  const { user, seedProducts, fetchProducts, fetchOrders, notifications } = useStore();
   const { t } = useTranslation();
   const [isOffline, setIsOffline] = React.useState(!navigator.onLine);
 
   useEffect(() => {
-    seedProducts();
-    const handleOnline = () => setIsOffline(false);
+    if (navigator.onLine && user) {
+      fetchProducts();
+      fetchOrders();
+    } else {
+      seedProducts();
+    }
+
+    const handleOnline = () => {
+      setIsOffline(false);
+      if (user) {
+        fetchProducts();
+        fetchOrders();
+      }
+    };
     const handleOffline = () => setIsOffline(true);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -21,7 +33,7 @@ const Layout = ({ children }) => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, [user]);
 
   if (!user) return <Login />;
 

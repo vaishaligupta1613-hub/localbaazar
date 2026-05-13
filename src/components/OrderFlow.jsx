@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const OrderFlow = () => {
   const { id } = useParams();
-  const { products, addOrder, user } = useStore();
+  const { products, createOrder, user } = useStore();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const receiptRef = useRef(null);
@@ -49,7 +49,7 @@ const OrderFlow = () => {
       a.download = `Receipt_${Date.now()}.png`;
       a.click();
       
-      addOrder({ product, quantity, date: new Date().toISOString(), paymentMethod });
+      await createOrder({ product, quantity, date: new Date().toISOString(), paymentMethod, sellerId: product.id, deliveryLocation: `${user.location?.lat || ''}, ${user.location?.lng || ''}`, product });
       setStep(4); // Success screen
     } catch (error) {
       console.error("Receipt generation failed", error);

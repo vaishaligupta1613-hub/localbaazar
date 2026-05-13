@@ -52,25 +52,22 @@ const MapView = () => {
   const center = [user.location.lat, user.location.lng];
   const isSeller = user.role === 'seller';
 
-  const sellerOrders = orders.filter(order => {
-    if (!order.product) return false;
-    return order.product.seller === user.shopDetails?.name || order.sellerName === user.name;
-  });
-
-  const buyerMarkers = sellerOrders
+  // Get all buyers from all orders
+  const buyerMarkers = orders
     .filter(order => order.buyerLocation)
     .map(order => ({
-      id: order.id,
+      id: `buyer-${order.id}`,
       position: [order.buyerLocation.lat, order.buyerLocation.lng],
       title: order.buyerName,
       subtitle: order.deliveryLocation || 'Buyer location',
       order
     }));
 
+  // Get all sellers from products
   const sellerMarkers = products
     .filter(product => product.location)
     .map(product => ({
-      id: product.id,
+      id: `seller-${product.id}`,
       position: [product.location.lat, product.location.lng],
       title: product.seller,
       subtitle: product.name,
@@ -80,11 +77,9 @@ const MapView = () => {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '20px', background: 'var(--bg-dark)', zIndex: 10 }}>
-        <h2>{isSeller ? 'Buyer Locations' : 'Seller Locations'}</h2>
+        <h2>Sellers and Buyers Locations</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          {isSeller
-            ? 'View buyer delivery spots for your current orders'
-            : 'Browse nearby sellers by location'}
+          Browse all nearby sellers and buyers on the map
         </p>
       </div>
       
@@ -102,39 +97,37 @@ const MapView = () => {
             </Popup>
           </Marker>
 
-          {isSeller ? (
-            buyerMarkers.length > 0 ? buyerMarkers.map(marker => (
-              <Marker key={marker.id} position={marker.position}>
-                <Popup>
-                  <div style={{ textAlign: 'center' }}>
-                    <strong>{marker.title}</strong>
-                    <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem' }}>{marker.subtitle}</p>
-                    <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Order: {marker.order.id}</p>
-                  </div>
-                </Popup>
-              </Marker>
-            )) : (
-              <></>
-            )
-          ) : (
-            sellerMarkers.map(marker => (
-              <Marker key={marker.id} position={marker.position}>
-                <Popup>
-                  <div style={{ textAlign: 'center' }}>
+          {buyerMarkers.map(marker => (
+            <Marker key={marker.id} position={marker.position} icon={buyerIcon}>
+              <Popup>
+                <div style={{ textAlign: 'center' }}>
+                  <strong>{marker.title}</strong>
+                  <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem' }}>{marker.subtitle}</p>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Order: {marker.order.id}</p>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {sellerMarkers.map(marker => (
+            <Marker key={marker.id} position={marker.position} icon={sellerIcon}>
+              <Popup>
+                <div style={{ textAlign: 'center' }}>
+                  {marker.product.image && (
                     <img src={marker.product.image} alt={marker.title} style={{ width: '50px', height: '50px', borderRadius: '4px', objectFit: 'cover' }} />
-                    <h4 style={{ margin: '8px 0 0 0' }}>{marker.title}</h4>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>{marker.subtitle}</p>
-                    <button 
-                      onClick={() => navigate(`/order/${marker.id}`)}
-                      style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', marginTop: '5px' }}
-                    >
-                      Buy Now
-                    </button>
-                  </div>
-                </Popup>
-              </Marker>
-            ))
-          )}
+                  )}
+                  <h4 style={{ margin: '8px 0 0 0' }}>{marker.title}</h4>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>{marker.subtitle}</p>
+                  <button 
+                    onClick={() => navigate(`/order/${marker.product.id}`)}
+                    style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', marginTop: '5px' }}
+                  >
+                    View Product
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
       </div>
     </div>

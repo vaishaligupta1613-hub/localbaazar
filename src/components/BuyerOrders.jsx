@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { Package, FileText, CheckCircle2, X, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -86,8 +86,14 @@ const ReceiptModal = ({ order, onClose }) => {
 };
 
 const BuyerOrders = () => {
-  const { orders } = useStore();
+  const { orders, fetchOrders } = useStore();
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  useEffect(() => {
+    if (orders.length === 0) {
+      fetchOrders();
+    }
+  }, [orders.length, fetchOrders]);
 
   // In a real app, we'd filter by current user's phone, but here we show all local orders for demo
   const myOrders = orders; 

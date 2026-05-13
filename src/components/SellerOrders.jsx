@@ -95,8 +95,14 @@ const SignaturePad = ({ onSave, onCancel }) => {
 };
 
 const SellerOrders = () => {
-  const { user, orders, signOrder } = useStore();
+  const { user, orders, signOrder, fetchOrders } = useStore();
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+
+  useEffect(() => {
+    if (orders.length === 0) {
+      fetchOrders({ sellerPhone: user?.phone });
+    }
+  }, [orders.length, fetchOrders, user]);
 
   const myOrders = orders.filter(order => order.product.seller === user.shopDetails?.name);
 
