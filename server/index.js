@@ -10,6 +10,14 @@ const DB_PATH = path.join(__dirname, 'localbazaar.db');
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.json({
+    status: 'Local Bazaar backend running',
+    api: '/api/products',
+    message: 'Use /api routes for product, order, receipt, review, and user endpoints.'
+  });
+});
+
 const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error('Failed to open database', err);
@@ -339,6 +347,10 @@ app.post('/api/users/login', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to login user' });
   }
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found', path: req.originalUrl });
 });
 
 initialize()

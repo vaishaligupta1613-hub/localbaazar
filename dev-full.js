@@ -1,26 +1,46 @@
 import { spawn } from 'child_process';
 import net from 'net';
 
-const PORTS = {
-  backend: 4000,
-  frontend: 5173
-};
+const DEFAULT_BACKEND_PORT = 4000;
+const DEFAULT_FRONTEND_PORT = 5173;
+const PORT_FALLBACK_RANGE = 10;
 
 function checkPortFree(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
-    server.once('error', () => {
-      resolve(false);
-    });
-    server.once('listening', () => {
-      server.close(() => resolve(true));
-    });
+    server.once('error', () => resolve(false));
+    server.once('listening', () => server.close(() => resolve(true)));
     server.listen(port, '127.0.0.1');
   });
 }
 
-function startProcess({ name, command, args }) {
-  const proc = spawn(command, args, { stdio: ['inherit', 'pipe', 'pipe'], shell: true });
+async function probeUrl(port, path = '/api/products') {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    const response = await fetch(`http://127.0.0.1:${port}${path}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function findFreePort(startPort) {
+  for (let port = startPort; port < startPort + PORT_FALLBACK_RANGE; port += 1) {
+    if (await checkPortFree(port)) {
+      return port;
+    }
+  }
+  return null;
+}
+
+function startProcess({ name, command, args, env }) {
+  const proc = spawn(command, args, {
+    stdio: ['inherit', 'pipe', 'pipe'],
+    shell: true,
+    env: { ...process.env, ...env }
+  });
 
   proc.stdout.on('data', (chunk) => {
     process.stdout.write(`[${name}] ${chunk}`);
@@ -43,24 +63,39 @@ function startProcess({ name, command, args }) {
 async function run() {
   const tasks = [];
   const runningProcesses = [];
+  let backendPort = DEFAULT_BACKEND_PORT;
+  let frontendPort = DEFAULT_FRONTEND_PORT;
 
-  const backendFree = await checkPortFree(PORTS.backend);
-  if (backendFree) {
-    tasks.push({ name: 'backend', command: 'npm', args: ['run', 'backend'] });
+  if (await checkPortFree(backendPort)) {
+    console.log(`Starting backend on port ${backendPort}`);
+    tasks.push({ name: 'backend', command: 'node', args: ['server/index.js'], env: { PORT: `${backendPort}` } });
+  } else if (await probeUrl(backendPort)) {
+    console.log(`Using existing backend on port ${backendPort}`);
   } else {
-    console.log(`Skipping backend: port ${PORTS.backend} already in use. Using existing backend instance.`);
+    const freePort = await findFreePort(backendPort + 1);
+    if (!freePort) {
+      console.error(`Cannot start backend: no free port found near ${backendPort}`);
+      process.exit(1);
+    }
+    backendPort = freePort;
+    console.log(`Port ${DEFAULT_BACKEND_PORT} is busy; starting backend on port ${backendPort}`);
+    tasks.push({ name: 'backend', command: 'node', args: ['server/index.js'], env: { PORT: `${backendPort}` } });
   }
 
-  const frontendFree = await checkPortFree(PORTS.frontend);
-  if (frontendFree) {
-    tasks.push({ name: 'frontend', command: 'npm', args: ['run', 'dev'] });
+  if (await checkPortFree(frontendPort)) {
+    console.log(`Starting frontend on port ${frontendPort}`);
+    tasks.push({ name: 'frontend', command: 'npm', args: ['run', 'dev'], env: { PORT: `${frontendPort}`, VITE_API_PORT: `${backendPort}` } });
+  } else if (await probeUrl(frontendPort, '/')) {
+    console.log(`Using existing frontend on port ${frontendPort}`);
   } else {
-    console.log(`Skipping frontend: port ${PORTS.frontend} already in use. Using existing frontend instance.`);
-  }
-
-  if (tasks.length === 0) {
-    console.error('No servers started because both ports are already in use. Stop the existing processes or choose different ports.');
-    process.exit(1);
+    const freePort = await findFreePort(frontendPort + 1);
+    if (!freePort) {
+      console.error(`Cannot start frontend: no free port found near ${frontendPort}`);
+      process.exit(1);
+    }
+    frontendPort = freePort;
+    console.log(`Port ${DEFAULT_FRONTEND_PORT} is busy; starting frontend on port ${frontendPort}`);
+    tasks.push({ name: 'frontend', command: 'npm', args: ['run', 'dev'], env: { PORT: `${frontendPort}`, VITE_API_PORT: `${backendPort}` } });
   }
 
   tasks.forEach((task) => runningProcesses.push(startProcess(task)));
