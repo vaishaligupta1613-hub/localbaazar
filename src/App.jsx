@@ -12,6 +12,10 @@ import BuyerOrders from './components/BuyerOrders';
 import Wallet from './components/Wallet';
 import Collections from './components/Collections';
 import Login from './components/Login';
+import RoleHome from './components/RoleHome';
+import AuthorizedContacts from './components/AuthorizedContacts';
+import SequentialOrderQueue from './components/SequentialOrderQueue';
+import LegalReceiptGenerator from './components/LegalReceiptGenerator';
 import { useStore } from './store';
 
 function App() {
@@ -67,6 +71,9 @@ function App() {
 
           <Route path="/wallet" element={<Wallet />} />
 
+          {/* Authorized Contacts Directory */}
+          <Route path="/contacts" element={<AuthorizedContacts />} />
+
           {/* Unified Routes (Available to all logged-in users) */}
           {user && (
             <>
@@ -83,10 +90,14 @@ function App() {
               <Route path="/seller-dashboard" element={<SellerDashboard />} />
               <Route path="/add-product" element={<AddProduct />} />
               <Route path="/seller-orders" element={<SellerOrders />} />
+              <Route path="/sequential-orders" element={<SequentialOrderQueue />} />
 
-              {/* Dynamic Home Route based on Mode */}
-              <Route path="/" element={<Navigate to={mode === 'seller' ? "/seller-dashboard" : "/feed"} />} />
-              <Route path="*" element={<Navigate to={mode === 'seller' ? "/seller-dashboard" : "/feed"} />} />
+              {/* Receipt Generation */}
+              <Route path="/receipt/:orderId" element={<LegalReceiptGenerator />} />
+
+              {/* Role Selection Home */}
+              <Route path="/" element={<RoleHome />} />
+              <Route path="*" element={<Navigate to="/" />} />
             </>
           )}
 

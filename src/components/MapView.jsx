@@ -14,7 +14,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Custom red icon for the user
+// Custom red icon for the current user
 const userIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
@@ -24,20 +24,68 @@ const userIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const sellerIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const buyerIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 const MapView = () => {
   const { t } = useTranslation();
-  const { user, products } = useStore();
+  const { user, products, orders } = useStore();
   const navigate = useNavigate();
   
   if (!user || !user.location) return <div>Loading map...</div>;
 
   const center = [user.location.lat, user.location.lng];
+  const isSeller = user.role === 'seller';
+
+  const sellerOrders = orders.filter(order => {
+    if (!order.product) return false;
+    return order.product.seller === user.shopDetails?.name || order.sellerName === user.name;
+  });
+
+  const buyerMarkers = sellerOrders
+    .filter(order => order.buyerLocation)
+    .map(order => ({
+      id: order.id,
+      position: [order.buyerLocation.lat, order.buyerLocation.lng],
+      title: order.buyerName,
+      subtitle: order.deliveryLocation || 'Buyer location',
+      order
+    }));
+
+  const sellerMarkers = products
+    .filter(product => product.location)
+    .map(product => ({
+      id: product.id,
+      position: [product.location.lat, product.location.lng],
+      title: product.seller,
+      subtitle: product.name,
+      product
+    }));
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '20px', background: 'var(--bg-dark)', zIndex: 10 }}>
-        <h2>Nearby Local Shops</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Showing sellers within your area</p>
+        <h2>{isSeller ? 'Buyer Locations' : 'Seller Locations'}</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+          {isSeller
+            ? 'View buyer delivery spots for your current orders'
+            : 'Browse nearby sellers by location'}
+        </p>
       </div>
       
       <div style={{ flex: 1 }}>
@@ -46,25 +94,38 @@ const MapView = () => {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          
+
           <Marker position={center} icon={userIcon}>
             <Popup>
-              <strong>You are here</strong><br/>
-              {user.role === 'seller' ? user.shopDetails?.name : 'Buyer'}
+              <strong>You are here</strong><br />
+              {user.role === 'seller' ? user.shopDetails?.name || 'Seller' : 'Buyer'}
             </Popup>
           </Marker>
-          
-          {products.map(product => {
-            if (!product.location) return null;
-            return (
-              <Marker key={product.id} position={[product.location.lat, product.location.lng]}>
+
+          {isSeller ? (
+            buyerMarkers.length > 0 ? buyerMarkers.map(marker => (
+              <Marker key={marker.id} position={marker.position}>
                 <Popup>
                   <div style={{ textAlign: 'center' }}>
-                    <img src={product.image} alt={product.name} style={{ width: '50px', height: '50px', borderRadius: '4px', objectFit: 'cover' }} />
-                    <h4 style={{ margin: '5px 0 0 0' }}>{product.seller}</h4>
-                    <p style={{ margin: '2px 0' }}>{product.name}</p>
+                    <strong>{marker.title}</strong>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '0.85rem' }}>{marker.subtitle}</p>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>Order: {marker.order.id}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            )) : (
+              <></>
+            )
+          ) : (
+            sellerMarkers.map(marker => (
+              <Marker key={marker.id} position={marker.position}>
+                <Popup>
+                  <div style={{ textAlign: 'center' }}>
+                    <img src={marker.product.image} alt={marker.title} style={{ width: '50px', height: '50px', borderRadius: '4px', objectFit: 'cover' }} />
+                    <h4 style={{ margin: '8px 0 0 0' }}>{marker.title}</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem' }}>{marker.subtitle}</p>
                     <button 
-                      onClick={() => navigate(`/order/${product.id}`)}
+                      onClick={() => navigate(`/order/${marker.id}`)}
                       style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', marginTop: '5px' }}
                     >
                       Buy Now
@@ -72,8 +133,8 @@ const MapView = () => {
                   </div>
                 </Popup>
               </Marker>
-            );
-          })}
+            ))
+          )}
         </MapContainer>
       </div>
     </div>

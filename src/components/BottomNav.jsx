@@ -21,6 +21,7 @@ const BottomNav = () => {
 
   const sellerNav = [
     { path: '/seller-dashboard', icon: LayoutDashboard, label: 'Stats' },
+    { path: '/map', icon: MapIcon, label: 'Map' },
     { path: '/add-product', icon: PlusCircle, label: 'Sell' },
     { path: '/seller-orders', icon: Package, label: 'Orders' },
     { path: '/wallet', icon: Wallet, label: 'Earnings' },
